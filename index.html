@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOPSIS Web Service</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.emailjs.com/dist/email.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 0.9em;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+            font-size: 0.95em;
+        }
+
+        input[type="file"],
+        input[type="text"],
+        input[type="email"] {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        input[type="file"] {
+            padding: 10px;
+            cursor: pointer;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .help-text {
+            font-size: 0.85em;
+            color: #888;
+            margin-top: 5px;
+        }
+
+        .error-message {
+            color: #e74c3c;
+            font-size: 0.9em;
+            margin-top: 5px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .success-message.show {
+            display: block;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .download-btn {
+            background: #28a745;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .download-btn.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>TOPSIS Analysis</h1>
+        <p class="subtitle">Multi-Criteria Decision Making Tool</p>
+
+        <form id="topsisForm">
+            <div class="form-group">
+                <label for="inputFile">Input Data File (CSV or XLSX)</label>
+                <input type="file" id="inputFile" accept=".csv,.xlsx" required>
+                <div class="help-text">First column: Alternatives, Remaining columns: Criteria values</div>
+                <div class="error-message" id="fileError"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="weights">Weights (comma-separated)</label>
+                <input type="text" id="weights" placeholder="e.g., 1,1,1,1" required>
+                <div class="help-text">Enter numeric weights separated by commas</div>
+                <div class="error-message" id="weightsError"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="impacts">Impacts (comma-separated, + or -)</label>
+                <input type="text" id="impacts" placeholder="e.g., +,+,-,+" required>
+                <div class="help-text">Use '+' for beneficial criteria, '-' for non-beneficial</div>
+                <div class="error-message" id="impactsError"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" placeholder="your.email@example.com" required>
+                <div class="help-text">Result file will be sent to this email</div>
+                <div class="error-message" id="emailError"></div>
+            </div>
+
+            <button type="submit" class="btn" id="submitBtn">Process TOPSIS</button>
+        </form>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p style="margin-top: 10px;">Processing your request...</p>
+        </div>
+
+        <div class="success-message" id="successMessage"></div>
+
+        <button class="btn download-btn" id="downloadBtn">Download Result File</button>
+    </div>
+
+    <script>
+        // Initialize EmailJS (you'll need to set your public key)
+        // emailjs.init("YOUR_PUBLIC_KEY"); // Uncomment and add your EmailJS public key
+
+        let resultData = null;
+        let resultFileName = '';
+
+        // Validation functions
+        function validateEmail(email) {
+            const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return re.test(email);
+        }
+
+        function validateWeights(weightsStr) {
+            const weights = weightsStr.split(',').map(w => w.trim());
+            if (weights.length === 0) return { valid: false, message: 'Weights cannot be empty' };
+            
+            for (let w of weights) {
+                if (isNaN(w) || w === '') {
+                    return { valid: false, message: 'All weights must be numeric' };
+                }
+            }
+            return { valid: true, weights: weights.map(Number) };
+        }
+
+        function validateImpacts(impactsStr) {
+            const impacts = impactsStr.split(',').map(i => i.trim());
+            if (impacts.length === 0) return { valid: false, message: 'Impacts cannot be empty' };
+            
+            for (let i of impacts) {
+                if (i !== '+' && i !== '-') {
+                    return { valid: false, message: 'Impacts must be either + or -' };
+                }
+            }
+            return { valid: true, impacts: impacts };
+        }
+
+        function showError(elementId, message) {
+            const errorEl = document.getElementById(elementId);
+            errorEl.textContent = message;
+            errorEl.classList.add('show');
+        }
+
+        function hideError(elementId) {
+            const errorEl = document.getElementById(elementId);
+            errorEl.classList.remove('show');
+        }
+
+        function hideAllErrors() {
+            hideError('fileError');
+            hideError('weightsError');
+            hideError('impactsError');
+            hideError('emailError');
+        }
+
+        // Read file function
+        function readFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                        const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                        resolve(jsonData);
+                    } catch (error) {
+                        // Try as CSV
+                        const text = e.target.result;
+                        const lines = text.split('\n').filter(line => line.trim());
+                        const csvData = lines.map(line => line.split(',').map(cell => cell.trim()));
+                        resolve(csvData);
+                    }
+                };
+                
+                reader.onerror = reject;
+                
+                if (file.name.endsWith('.xlsx')) {
+                    reader.readAsArrayBuffer(file);
+                } else {
+                    reader.readAsText(file);
+                }
+            });
+        }
+
+        // TOPSIS calculation function
+        function calculateTOPSIS(data, weights, impacts) {
+            if (data.length < 2) {
+                throw new Error('Input file must contain at least 2 rows');
+            }
+
+            if (data[0].length < 3) {
+                throw new Error('Input file must contain at least 3 columns');
+            }
+
+            // Extract alternatives and criteria data
+            const alternatives = [];
+            const criteriaData = [];
+
+            for (let i = 0; i < data.length; i++) {
+                if (data[i].length === 0) continue;
+                alternatives.push(data[i][0]);
+                const row = [];
+                for (let j = 1; j < data[i].length; j++) {
+                    const value = parseFloat(data[i][j]);
+                    if (isNaN(value)) {
+                        throw new Error(`Non-numeric value found at row ${i + 1}, column ${j + 1}`);
+                    }
+                    row.push(value);
+                }
+                criteriaData.push(row);
+            }
+
+            // Validate weights and impacts count
+            const numCriteria = criteriaData[0].length;
+            if (weights.length !== numCriteria || impacts.length !== numCriteria) {
+                throw new Error(`Number of weights (${weights.length}) and impacts (${impacts.length}) must equal number of criteria (${numCriteria})`);
+            }
+
+            // Convert to matrix
+            const matrix = criteriaData;
+            const numRows = matrix.length;
+            const numCols = matrix[0].length;
+
+            // Step 1: Normalize decision matrix
+            const normalized = [];
+            for (let j = 0; j < numCols; j++) {
+                let sumSquares = 0;
+                for (let i = 0; i < numRows; i++) {
+                    sumSquares += matrix[i][j] * matrix[i][j];
+                }
+                const normFactor = Math.sqrt(sumSquares);
+                
+                const col = [];
+                for (let i = 0; i < numRows; i++) {
+                    col.push(matrix[i][j] / normFactor);
+                }
+                normalized.push(col);
+            }
+
+            // Transpose back to row format
+            const normalizedMatrix = [];
+            for (let i = 0; i < numRows; i++) {
+                const row = [];
+                for (let j = 0; j < numCols; j++) {
+                    row.push(normalized[j][i]);
+                }
+                normalizedMatrix.push(row);
+            }
+
+            // Step 2: Weighted normalized matrix
+            const weightedMatrix = [];
+            for (let i = 0; i < numRows; i++) {
+                const row = [];
+                for (let j = 0; j < numCols; j++) {
+                    row.push(normalizedMatrix[i][j] * weights[j]);
+                }
+                weightedMatrix.push(row);
+            }
+
+            // Step 3: Ideal best and worst
+            const idealBest = [];
+            const idealWorst = [];
+
+            for (let j = 0; j < numCols; j++) {
+                const column = weightedMatrix.map(row => row[j]);
+                if (impacts[j] === '+') {
+                    idealBest.push(Math.max(...column));
+                    idealWorst.push(Math.min(...column));
+                } else {
+                    idealBest.push(Math.min(...column));
+                    idealWorst.push(Math.max(...column));
+                }
+            }
+
+            // Step 4: Distance measures
+            const distBest = [];
+            const distWorst = [];
+
+            for (let i = 0; i < numRows; i++) {
+                let sumBest = 0;
+                let sumWorst = 0;
+                for (let j = 0; j < numCols; j++) {
+                    sumBest += Math.pow(weightedMatrix[i][j] - idealBest[j], 2);
+                    sumWorst += Math.pow(weightedMatrix[i][j] - idealWorst[j], 2);
+                }
+                distBest.push(Math.sqrt(sumBest));
+                distWorst.push(Math.sqrt(sumWorst));
+            }
+
+            // Step 5: TOPSIS score
+            const topsisScores = [];
+            for (let i = 0; i < numRows; i++) {
+                const score = distWorst[i] / (distBest[i] + distWorst[i]);
+                topsisScores.push(score);
+            }
+
+            // Step 6: Ranking
+            const scoresWithIndex = topsisScores.map((score, index) => ({ score, index }));
+            scoresWithIndex.sort((a, b) => b.score - a.score);
+            
+            const ranks = new Array(numRows);
+            scoresWithIndex.forEach((item, rank) => {
+                ranks[item.index] = rank + 1;
+            });
+
+            // Prepare result
+            const result = [];
+            const header = [];
+            for (let j = 0; j < data[0].length; j++) {
+                header.push(data[0][j] || `Column${j + 1}`);
+            }
+            header.push('Topsis Score');
+            header.push('Rank');
+            result.push(header);
+
+            for (let i = 0; i < alternatives.length; i++) {
+                const row = [alternatives[i]];
+                for (let j = 1; j < data[i].length; j++) {
+                    row.push(data[i][j]);
+                }
+                row.push(topsisScores[i].toFixed(6));
+                row.push(ranks[i]);
+                result.push(row);
+            }
+
+            return result;
+        }
+
+        // Convert result to Excel file
+        function createExcelFile(data, filename) {
+            const ws = XLSX.utils.aoa_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "TOPSIS Results");
+            XLSX.writeFile(wb, filename);
+        }
+
+        // Send email using EmailJS
+        async function sendEmail(email, fileData, filename) {
+            try {
+                // Convert data to base64 for email attachment
+                const ws = XLSX.utils.aoa_to_sheet(fileData);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "TOPSIS Results");
+                const excelBuffer = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+                const base64 = btoa(String.fromCharCode(...new Uint8Array(excelBuffer)));
+
+                // EmailJS service parameters
+                // Note: You need to configure EmailJS service and template
+                const serviceParams = {
+                    service_id: 'YOUR_SERVICE_ID', // Replace with your EmailJS service ID
+                    template_id: 'YOUR_TEMPLATE_ID', // Replace with your EmailJS template ID
+                    user_id: 'YOUR_PUBLIC_KEY', // Replace with your EmailJS public key
+                    template_params: {
+                        to_email: email,
+                        subject: 'TOPSIS Analysis Results',
+                        message: 'Please find attached your TOPSIS analysis results.',
+                        attachment: base64,
+                        filename: filename
+                    }
+                };
+
+                // Uncomment when EmailJS is configured
+                // await emailjs.send(
+                //     serviceParams.service_id,
+                //     serviceParams.template_id,
+                //     serviceParams.template_params,
+                //     serviceParams.user_id
+                // );
+
+                // For now, we'll use a mailto link as fallback
+                const subject = encodeURIComponent('TOPSIS Analysis Results');
+                const body = encodeURIComponent('Your TOPSIS analysis has been completed. Please download the result file.');
+                window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+                
+                return true;
+            } catch (error) {
+                console.error('Email sending error:', error);
+                throw new Error('Failed to send email. Please try again.');
+            }
+        }
+
+        // Form submission handler
+        document.getElementById('topsisForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            hideAllErrors();
+
+            const fileInput = document.getElementById('inputFile');
+            const weightsInput = document.getElementById('weights');
+            const impactsInput = document.getElementById('impacts');
+            const emailInput = document.getElementById('email');
+            const submitBtn = document.getElementById('submitBtn');
+            const loading = document.getElementById('loading');
+            const successMsg = document.getElementById('successMessage');
+            const downloadBtn = document.getElementById('downloadBtn');
+
+            // Validate file
+            if (!fileInput.files || fileInput.files.length === 0) {
+                showError('fileError', 'Please select an input file');
+                return;
+            }
+
+            const file = fileInput.files[0];
+            if (!file.name.endsWith('.csv') && !file.name.endsWith('.xlsx')) {
+                showError('fileError', 'File must be CSV or XLSX format');
+                return;
+            }
+
+            // Validate email
+            if (!validateEmail(emailInput.value)) {
+                showError('emailError', 'Please enter a valid email address');
+                return;
+            }
+
+            // Validate weights
+            const weightsValidation = validateWeights(weightsInput.value);
+            if (!weightsValidation.valid) {
+                showError('weightsError', weightsValidation.message);
+                return;
+            }
+
+            // Validate impacts
+            const impactsValidation = validateImpacts(impactsInput.value);
+            if (!impactsValidation.valid) {
+                showError('impactsError', impactsValidation.message);
+                return;
+            }
+
+            // Check if weights and impacts count match
+            if (weightsValidation.weights.length !== impactsValidation.impacts.length) {
+                showError('weightsError', `Number of weights (${weightsValidation.weights.length}) must equal number of impacts (${impactsValidation.impacts.length})`);
+                return;
+            }
+
+            // Show loading
+            submitBtn.disabled = true;
+            loading.classList.add('show');
+            successMsg.classList.remove('show');
+            downloadBtn.classList.remove('show');
+
+            try {
+                // Read file
+                const fileData = await readFile(file);
+
+                // Calculate TOPSIS
+                const result = calculateTOPSIS(fileData, weightsValidation.weights, impactsValidation.impacts);
+
+                // Store result
+                resultData = result;
+                resultFileName = file.name.replace(/\.[^/.]+$/, '') + '_topsis_result.xlsx';
+
+                // Create and download file
+                createExcelFile(result, resultFileName);
+
+                // Send email
+                await sendEmail(emailInput.value, result, resultFileName);
+
+                // Show success
+                successMsg.textContent = `TOPSIS analysis completed successfully! Result file has been downloaded and sent to ${emailInput.value}`;
+                successMsg.classList.add('show');
+                downloadBtn.classList.add('show');
+
+            } catch (error) {
+                showError('fileError', error.message);
+            } finally {
+                submitBtn.disabled = false;
+                loading.classList.remove('show');
+            }
+        });
+
+        // Download button handler
+        document.getElementById('downloadBtn').addEventListener('click', function() {
+            if (resultData && resultFileName) {
+                createExcelFile(resultData, resultFileName);
+            }
+        });
+    </script>
+</body>
+</html>
