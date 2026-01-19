@@ -1172,12 +1172,12 @@
                 };
 
                 // Uncomment when EmailJS is configured
-                // await emailjs.send(
-                //     serviceParams.service_id,
-                //     serviceParams.template_id,
-                //     serviceParams.template_params,
-                //     serviceParams.user_id
-                // );
+                await emailjs.send(
+                    serviceParams.service_id,
+                    serviceParams.template_id,
+                    serviceParams.template_params,
+                    serviceParams.user_id
+                );
 
                 // For now, we'll use a mailto link as fallback
                 const subject = encodeURIComponent('TOPSIS Analysis Results');
